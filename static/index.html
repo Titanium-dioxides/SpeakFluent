@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Speakfluent——AI让英语对话更流畅</title>
+  <style>
+    :root{
+      --bg:#0f172a; --soft:#0b1220; --text:#e5e7eb; --muted:#94a3b8;
+      --accent:#38bdf8; --ring:#22d3ee; --shadow:0 6px 24px rgba(0,0,0,.25);
+      --sb-thumb:#274470; --sb-thumb-hover:#3a6aa3;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b1020,var(--bg));color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",Arial,"Noto Sans CJK SC",sans-serif;overflow:hidden;}
+    .app{display:grid;grid-template-columns:300px 1fr;height:100vh;width:100vw;}
+    .sidebar{background:linear-gradient(180deg,var(--soft),#0b0f1a);border-right:1px solid #1f2a44;display:flex;flex-direction:column;gap:12px;padding:16px;overflow:hidden;}
+    .brand{display:flex;align-items:center;gap:10px;padding:6px 8px;}
+    .brand .logo{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,#22d3ee,#0ea5e9);color:#001018;font-weight:800;box-shadow:var(--shadow);}
+    .title{font-weight:700}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{background:#0f172a;border:1px solid #1f2a44;border-radius:10px;color:var(--text);padding:8px 10px;cursor:pointer;transition:.15s;user-select:none}
+    .btn:hover{border-color:#274470;transform:translateY(-1px)}
+    .btn.primary{background:linear-gradient(135deg,#0ea5e9,#22d3ee);color:#06121b;font-weight:700}
+    .btn.ghost{background:transparent}
+    .btn.danger{border-color:#4b1d1d;color:#fecaca}
+    .btn:disabled{background:#1f2937;color:#6b7280;cursor:not-allowed}
+    .search input{width:100%;background:#0f172a;border:1px solid #1f2a44;color:var(--text);padding:10px 12px;border-radius:10px;outline:none;transition:.15s}
+    .search input:focus{border-color:#274470;box-shadow:0 0 0 3px #0ea5e933}
+    .history{flex:1;margin-top:6px;padding-right:2px;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable both-edges;-webkit-overflow-scrolling:touch;position:relative;z-index:0;}
+    .session{display:flex;align-items:center;gap:8px;padding:10px;border-radius:10px;cursor:pointer;transition:.12s;border:1px solid transparent;}
+    .session:hover{background:#0f172a;border-color:#1f2a44}
+    .session.active{background:#0e2533;border-color:#1a4f63}
+    .session .name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .session .time{color:var(--muted);font-size:12px}
+    .main{display:grid;grid-template-rows:auto 1fr auto;height:100vh;overflow:hidden;position:relative;}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid #16223b;background:rgba(0,0,0,.15);position:relative;z-index:2;}
+    .conv-title{display:flex;align-items:center;gap:10px;font-weight:700}
+    .conv-title input{background:transparent;border:1px dashed transparent;color:var(--text);padding:4px 6px;border-radius:8px;font-weight:700;font-size:16px;width:min(46vw,520px)}
+    .conv-title input:focus{border-color:#274470;outline:none;background:#0b1624}
+    .voice-panel{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+    .voice-panel .field{display:flex;align-items:center;gap:6px}
+    select,input[type="range"]{background:#0f172a;color:var(--text);border:1px solid #1f2a44;border-radius:10px;padding:8px;outline:none;transition:.15s}
+    select:focus,input[type="range"]:focus{box-shadow:0 0 0 3px #0ea5e933;border-color:#274470}
+    .chat{overflow-y:auto;overflow-x:hidden;padding:20px 24px 24px;scroll-behavior:smooth;background:radial-gradient(600px 200px at 30% -10%,#08334440,transparent);scrollbar-gutter:stable both-edges;-webkit-overflow-scrolling:touch;position:relative;z-index:1;}
+    .msg{display:grid;grid-template-columns:36px 1fr;gap:12px;margin:8px 0;align-items:flex-start}
+    .avatar{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:800}
+    .avatar.user{background:#334155;color:#e2e8f0}
+    .avatar.ai{background:linear-gradient(135deg,#0ea5e9,#22d3ee);color:#04121a}
+    .bubble{background:#1f2937;border:1px solid #1f2a44;border-radius:14px;padding:12px 14px;box-shadow:var(--shadow)}
+    .bubble.ai{background:#0ea5e91a;border-color:#184a5c}
+    .bubble .meta{font-size:12px;color:var(--muted);margin-bottom:6px}
+    .bubble .tools{display:flex;gap:8px;opacity:.9;margin-top:6px}
+    .bubble .tools button{background:transparent;border:1px solid #1f2a44;color:var(--text);padding:4px 8px;border-radius:8px;cursor:pointer}
+    .composer{display:grid;grid-template-columns:1fr auto auto;gap:10px;padding:14px 18px;border-top:1px solid #16223b;background:linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.25));position:relative;z-index:2;}
+    .input-wrap{display:flex;align-items:center;background:#0f172a;border:1px solid #1f2a44;border-radius:14px;padding:8px 10px;box-shadow:var(--shadow)}
+    textarea{flex:1;resize:none;background:transparent;border:none;color:#e5e7eb;outline:none;font:inherit;padding:6px 8px;height:56px}
+    .send{min-width:120px;background:linear-gradient(135deg,#0ea5e9,#22d3ee);color:#03131c;font-weight:800;border:none;border-radius:12px;padding:14px 18px;cursor:pointer;box-shadow:var(--shadow)}
+    .muted{color:var(--muted)}
+    .empty{margin:40px auto;max-width:680px;text-align:center;color:var(--muted);padding:24px;background:#0f172a;border:1px dashed #223155;border-radius:16px}
+    @media (max-width:980px){.app{grid-template-columns:1fr}.sidebar{display:none}.voice-panel{justify-content:flex-start}}
+    *{scrollbar-width:thin;scrollbar-color:var(--sb-thumb) transparent;}
+    ::-webkit-scrollbar{width:10px;height:10px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--sb-thumb);border-radius:8px;border:2px solid transparent;background-clip:content-box}
+    ::-webkit-scrollbar-thumb:hover{background:var(--sb-thumb-hover)}
+  </style>
+</head>
+<body>
+  <!-- 登录弹窗 -->
+  <div id="loginModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#0f172a;padding:20px;border-radius:10px">
+      <h3>登录</h3>
+      <input id="loginUsername" placeholder="用户名" style="margin:5px;padding:5px"><br>
+      <input id="password" type="password" placeholder="密码" style="margin:5px;padding:5px"><br>
+      <button id="loginBtn" onclick="login()">登录</button>
+      <button id="registerBtn" onclick="register()">注册</button>
+      <button onclick="closeModal()">关闭</button>
+    </div>
+  </div>
+
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="logo">SF</div>
+        <div>
+          <div class="title">Speakfluent——AI让英语对话更流畅</div>
+          <div class="muted">当前用户: <span id="username">未登录</span></div>
+          <div class="muted">历史可续聊 · 模块独立滚动</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="btn primary" id="btnNew">新建对话</button>
+        <button class="btn ghost" id="btnExport">导出全部</button>
+        <button class="btn danger" id="btnClearAll">清空</button>
+        <button class="btn ghost" id="btnLogout">注销</button>
+      </div>
+      <div class="search" style="margin-top:6px">
+        <input id="searchInput" placeholder="搜索历史会话…" />
+      </div>
+      <div class="history" id="history"></div>
+      <div class="muted" style="font-size:12px">数据保存在 <code>localStorage</code>。</div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="conv-title">
+          <span class="muted">会话标题：</span>
+          <input id="convTitle" value="新的对话" />
+        </div>
+        <div class="voice-panel">
+          <label title="开启后，AI 回复将自动播报" style="display:flex;gap:8px;align-items:center">
+            <input type="checkbox" id="toggleSpeak" checked>
+            <span>自动播报</span>
+          </label>
+          <div class="field"><span class="muted">发音人</span>
+            <select id="voiceSelect"></select>
+            <button class="btn ghost" id="btnReloadVoices">刷新声音</button>
+          </div>
+          <div class="field"><span class="muted">语速</span><input id="rate" type="range" min="0.5" max="2" step="0.05" value="1"></div>
+          <div class="field"><span class="muted">音调</span><input id="pitch" type="range" min="0" max="2" step="0.05" value="1"></div>
+          <div class="field"><span class="muted">音量</span><input id="volume" type="range" min="0" max="1" step="0.05" value="1"></div>
+          <button class="btn ghost" id="btnStopSpeak">停止</button>
+          <button class="btn ghost" id="btnMute">静音</button>
+        </div>
+      </div>
+      <div class="chat" id="chat">
+        <div class="empty">👋 发消息试试。这里是<b>聊天区的独立滚动条</b>。</div>
+      </div>
+      <div class="composer">
+        <div class="input-wrap"><textarea id="input" placeholder="输入内容，Shift+Enter 换行…"></textarea></div>
+        <button class="send" id="btnSend">发送</button>
+        <button class="send" id="spkSend">
+          <img src="/static/images/OIP-C.webp" alt="点击说话" width="50px">
+        </button>
+      </div>
+    </main>
+  </div>
+  <script>
+    /* ================= 配置 ================= */
+    const API_ENDPOINT = "http://localhost:8000";
+
+    /* ================= 状态 ================= */
+    const storeKey = "ai_tutor_sessions_v1";
+    const state = {
+      sessions: [],
+      currentId: null,
+      speakingMuted: false,
+      token: localStorage.getItem('token') || null,
+      username: localStorage.getItem('username') || null,
+      isLoggingIn: false,
+      isSending: false // 防止重复发送
+    };
+
+    /* ================= 工具 ================= */
+    const $ = (s, r = document) => r.querySelector(s);
+    const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+    const now = () => Date.now();
+    const fmt = t => new Date(t).toLocaleString();
+    const save = () => localStorage.setItem(storeKey, JSON.stringify(state.sessions));
+    const escapeHTML = (str = "") => str.replace(/&/g, "&amp;").replace(/</g, "&gt;").replace(/</g, "&lt;");
+    const toast = (msg, dur = 1600) => {
+      const t = document.createElement("div");
+      t.textContent = msg;
+      Object.assign(t.style, { position: "fixed", left: "50%", top: "10%", transform: "translateX(-50%)", background: "#0b1624", color: "#e5e7eb", border: "1px solid #1f2a44", padding: "10px 14px", borderRadius: "10px", zIndex: 9999, boxShadow: "var(--shadow)" });
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), dur);
+    };
+
+    /* ================= Token 验证 ================= */
+    async function validateToken(token) {
+      try {
+        const res = await fetch(`${API_ENDPOINT}/validate-token`, {
+          method: "GET",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        return res.ok;
+      } catch (err) {
+        console.error("Token validation failed:", err.message);
+        return false;
+      }
+    }
+
+    /* ================= 会话验证 ================= */
+    async function validateConversation(convId) {
+      try {
+        const res = await fetch(`${API_ENDPOINT}/conversations/${convId}`, {
+          method: "GET",
+          headers: { "Authorization": `Bearer ${state.token}` }
+        });
+        return res.ok;
+      } catch (err) {
+        console.error("Conversation validation failed:", err.message);
+        return false;
+      }
+    }
+
+    /* ================= 同步会话 ================= */
+    async function syncConversations() {
+      try {
+        const res = await fetch(`${API_ENDPOINT}/conversations`, {
+          method: "GET",
+          headers: { "Authorization": `Bearer ${state.token}` }
+        });
+        if (!res.ok) {
+          if (res.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            state.token = null;
+            state.username = null;
+            $("#username").textContent = "未登录";
+            showModal();
+            throw new Error("登录已过期，请重新登录");
+          }
+          throw new Error("获取会话列表失败 " + res.status);
+        }
+        const remoteConvs = await res.json();
+        state.sessions = state.sessions.filter(s => remoteConvs.some(rc => rc.id === s.id));
+        remoteConvs.forEach(rc => {
+          if (!state.sessions.some(s => s.id === rc.id)) {
+            state.sessions.push({
+              id: rc.id,
+              name: rc.title,
+              createdAt: now(),
+              updatedAt: now(),
+              messages: rc.history ? JSON.parse(rc.history) : []
+            });
+          }
+        });
+        save();
+        if (!state.sessions.some(s => s.id === state.currentId)) {
+          state.currentId = null;
+        }
+      } catch (err) {
+        console.error("Sync conversations failed:", err.message);
+        toast("同步会话失败: " + err.message);
+      }
+    }
+
+    /* ================= 远程创建会话 ================= */
+    const createRemoteSession = async (title = "新的对话") => {
+      const res = await fetch(`${API_ENDPOINT}/conversations`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${state.token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ title })
+      });
+      if (!res.ok) {
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('username');
+          state.token = null;
+          state.username = null;
+          $("#username").textContent = "未登录";
+          showModal();
+          throw new Error("登录已过期，请重新登录");
+        }
+        throw new Error("创建会话失败 " + res.status);
+      }
+      return await res.json();
+    };
+
+    /* ================= 数据&渲染 ================= */
+    const findSession = id => state.sessions.find(s => s.id === id);
+    const selectSession = id => {
+      state.currentId = id;
+      renderHistory();
+      renderChat();
+      const s = findSession(id);
+      $("#convTitle").value = s?.name || "新的对话";
+      document.title = s?.name ? `${s.name} · AI 导师` : "AI 导师";
+    };
+    const renameCurrent = (title) => {
+      const s = findSession(state.currentId);
+      if (!s) return;
+      s.name = title.trim() || "未命名对话";
+      s.updatedAt = now();
+      save();
+      renderHistory();
+    };
+    const deleteSession = id => {
+      const i = state.sessions.findIndex(s => s.id === id);
+      if (i >= 0) {
+        state.sessions.splice(i, 1);
+        save();
+        if (state.currentId === id) {
+          const s = state.sessions[0] || { id: "s_fallback", name: "新的对话", createdAt: now(), updatedAt: now(), messages: [] };
+          selectSession(s.id);
+        } else {
+          renderHistory();
+        }
+      }
+    };
+
+    const renderHistory = () => {
+      const box = $("#history");
+      const q = ($("#searchInput").value || "").toLowerCase();
+      box.innerHTML = "";
+      state.sessions.filter(s => !q || s.name.toLowerCase().includes(q))
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .forEach(s => {
+          const el = document.createElement("div");
+          el.className = "session" + (state.currentId === s.id ? " active" : "");
+          el.innerHTML = `<div class="name" title="${s.name}">${s.name}</div><div class="time">${new Date(s.updatedAt).toLocaleDateString()}</div>`;
+          el.addEventListener("click", () => selectSession(s.id));
+          el.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+            if (confirm(`删除《${s.name}》？`)) deleteSession(s.id);
+          });
+          box.appendChild(el);
+        });
+    };
+
+    const msgHTML = (m, i) => {
+      const isAI = m.role === "assistant";
+      const role = isAI ? "ai" : (m.role === "error" ? "ai" : "user");
+      const meta = `${isAI ? "AI" : (m.role === "error" ? "系统" : "你")} · ${fmt(m.time)}`;
+      const tools = isAI ? `<div class="tools">
+        <button data-act="speak" data-idx="${i}">朗读</button>
+        <button data-act="copy"  data-idx="${i}">复制</button>
+        <button data-act="regen" data-idx="${i}">重试</button>
+      </div>` : "";
+      return `<div class="msg">
+        <div class="avatar ${role}">${isAI ? "AI" : "你"}</div>
+        <div class="bubble ${isAI ? "ai" : ""}">
+          <div class="meta">${meta}</div>
+          <div class="content">${escapeHTML(m.content).replace(/\n/g, "<br/>")}</div>
+          ${tools}
+        </div>
+      </div>`;
+    };
+
+    const renderChat = () => {
+      const s = findSession(state.currentId);
+      const box = $("#chat");
+      if (!s || !s.messages.length) {
+        box.innerHTML = `<div class="empty">暂无消息。开始聊天吧！</div>`;
+        return;
+      }
+      box.innerHTML = s.messages.map((m, i) => msgHTML(m, i)).join("");
+      box.querySelectorAll(".tools button").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          const idx = +e.currentTarget.dataset.idx;
+          const act = e.currentTarget.dataset.act;
+          if (act === "copy") {
+            navigator.clipboard.writeText(s.messages[idx].content).then(() => toast("已复制"));
+          }
+          if (act === "regen") {
+            const k = findPrevUserIndex(s.messages, idx);
+            if (k >= 0) send(s.messages[k].content, true);
+          }
+          if (act === "speak") playAudioFromServer(s.messages[idx].audio);
+        });
+      });
+      box.scrollTop = box.scrollHeight + 400;
+    };
+
+    const findPrevUserIndex = (msgs, from) => {
+      for (let i = from; i >= 0; i--) if (msgs[i].role === "user") return i;
+      return -1;
+    };
+
+    /* ================= 发送消息 ================= */
+    const addMessage = (role, content, audio = null) => {
+      const s = findSession(state.currentId);
+      if (!s) return;
+      s.messages.push({ role, content, time: now(), audio });
+      s.updatedAt = now();
+      save();
+      renderChat();
+    };
+
+    const send = async (text, isRetry = false) => {
+      if (state.isSending) {
+          toast("正在发送，请稍候");
+          return;
+      }
+      state.isSending = true;
+      $("#btnSend").disabled = true;
+      $("#spkSend").disabled = true;
+
+      const content = (text || $("#input").value || "").trim();
+      if (!content && !$("#spkSend").files?.length) {
+          console.error("No content or audio provided");
+          toast("请输入文本或上传音频");
+          state.isSending = false;
+          $("#btnSend").disabled = false;
+          $("#spkSend").disabled = false;
+          return;
+      }
+      if (!state.token) {
+          console.error("No token available, please login");
+          toast("请先登录");
+          showModal();
+          state.isSending = false;
+          $("#btnSend").disabled = false;
+          $("#spkSend").disabled = false;
+          return;
+      }
+
+      if (!(await validateConversation(state.currentId))) {
+          try {
+              const remote = await createRemoteSession("新的对话");
+              state.sessions = state.sessions.filter(s => s.id !== state.currentId);
+              const newSession = { id: remote.id, name: remote.title, createdAt: now(), updatedAt: now(), messages: [] };
+              state.sessions.unshift(newSession);
+              state.currentId = newSession.id;
+              save();
+              selectSession(newSession.id);
+              toast("原会话不存在，已创建新会话");
+          } catch (e) {
+              toast("创建新会话失败: " + e.message);
+              state.isSending = false;
+              $("#btnSend").disabled = false;
+              $("#spkSend").disabled = false;
+              return;
+          }
+      }
+
+      const s = findSession(state.currentId);
+      if (!s) {
+          console.error("No session found for currentId:", state.currentId);
+          toast("未找到会话，请创建新会话");
+          state.isSending = false;
+          $("#btnSend").disabled = false;
+          $("#spkSend").disabled = false;
+          return;
+      }
+      if (s.messages.filter(m => m.role === "user").length === 0) renameCurrent(content.slice(0, 20));
+      if (!isRetry) addMessage("user", content);
+
+      const tempId = "t_" + Math.random().toString(36).slice(2);
+      s.messages.push({ role: "assistant", content: "正在思考…", time: now(), tempId });
+      save();
+      renderChat();
+      $("#input").value = "";
+      $("#input").focus();
+
+      try {
+          const formData = new FormData();
+          if ($("#spkSend").files?.[0]) {
+              formData.append("audio", $("#spkSend").files[0]);
+              console.log("Sending audio:", $("#spkSend").files[0].name, $("#spkSend").files[0].type);
+          } else {
+              formData.append("text", content);
+              console.log("Sending text:", content);
+          }
+
+          console.log("Token:", state.token);
+          console.log("Conversation ID:", s.id);
+          const res = await fetch(`${API_ENDPOINT}/conversations/${String(s.id)}/chat`, {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${state.token}` },
+              body: formData
+          });
+          if (!res.ok) {
+              if (res.status === 401) {
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('username');
+                  state.token = null;
+                  state.username = null;
+                  $("#username").textContent = "未登录";
+                  showModal();
+                  throw new Error("登录已过期，请重新登录");
+              }
+              if (res.status === 404) {
+                  try {
+                      const remote = await createRemoteSession("新的对话");
+                      state.sessions = state.sessions.filter(s => s.id !== state.currentId);
+                      const newSession = { id: remote.id, name: remote.title, createdAt: now(), updatedAt: now(), messages: [] };
+                      state.sessions.unshift(newSession);
+                      state.currentId = newSession.id;
+                      save();
+                      selectSession(newSession.id);
+                      toast("会话不存在，已创建新会话");
+                      return send(content, isRetry); // 重试发送
+                  } catch (e) {
+                      throw new Error("无法创建新会话: " + e.message);
+                  }
+              }
+              const errorText = await res.text();
+              throw new Error(`接口失败：${res.status} ${res.statusText} - ${errorText}`);
+          }
+          const data = await res.json();
+          console.log("Chat response:", data);
+          handleAIResponse(tempId, data);
+      } catch (err) {
+          console.error("Chat error:", err.message);
+          replaceThinkingWithError(tempId, err.message || "请求失败");
+      } finally {
+          state.isSending = false;
+          $("#btnSend").disabled = false;
+          $("#spkSend").disabled = false;
+      }
+  };
+
+    const handleAIResponse = (tempId, data) => {
+      const s = findSession(state.currentId);
+      if (!s) return;
+      let text = data?.reply || data?.text;
+      if (!text && Array.isArray(data?.choices) && data.choices[0]?.message?.content) text = data.choices[0].message.content;
+      if (!text) text = "[后端未返回 reply 字段]";
+      const i = s.messages.findIndex(m => m.tempId === tempId);
+      if (i >= 0) s.messages[i] = { role: "assistant", content: text, time: now(), audio: data.audio };
+      else s.messages.push({ role: "assistant", content: text, time: now(), audio: data.audio });
+      s.updatedAt = now();
+      save();
+      renderChat();
+      if ($("#toggleSpeak").checked && !state.speakingMuted && data.audio) playAudioFromServer(data.audio);
+    };
+
+    const replaceThinkingWithError = (tempId, msg) => {
+      const s = findSession(state.currentId);
+      if (!s) return;
+      const i = s.messages.findIndex(m => m.tempId === tempId);
+      const t = `❌ 出错：${msg}`;
+      if (i >= 0) s.messages[i] = { role: "error", content: t, time: now() };
+      else s.messages.push({ role: "error", content: t, time: now() });
+      s.updatedAt = now();
+      save();
+      renderChat();
+    };
+
+    /* ================= 语音播放（后端音频） ================= */
+/* ================= 语音播放（后端音频） ================= */
+const playAudioFromServer = async (audioData) => {
+    if (!(await validateConversation(state.currentId))) {
+        try {
+            const remote = await createRemoteSession("新的对话");
+            state.sessions = state.sessions.filter(s => s.id !== state.currentId);
+            const newSession = { id: remote.id, name: remote.title, createdAt: now(), updatedAt: now(), messages: [] };
+            state.sessions.unshift(newSession);
+            state.currentId = newSession.id;
+            save();
+            selectSession(newSession.id);
+            toast("原会话不存在，已创建新会话");
+        } catch (e) {
+            toast("创建新会话失败: " + e.message);
+            return;
+        }
+    }
+
+    try {
+        if (!audioData) {
+            console.warn("No audio data provided, fetching from server...");
+            const res = await fetch(`${API_ENDPOINT}/conversations/${state.currentId}/chat`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${state.token}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ text: "Please generate audio" })
+            });
+            if (!res.ok) throw new Error(`音频请求失败：${res.status}`);
+            const data = await res.json();
+            audioData = data.audio;
+        }
+
+        console.log("Received audio data length:", audioData.length);
+        const binaryString = atob(audioData);
+        const audioBytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            audioBytes[i] = binaryString.charCodeAt(i);
+        }
+        // 验证 WAV 头
+        console.log("WAV header:", String.fromCharCode(...audioBytes.slice(0, 4)));
+        const audioBlob = new Blob([audioBytes], { type: "audio/wav" });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        await audio.play().catch(err => {
+            console.error("Audio play failed:", err);
+            const errorBlob = new Blob([audioBytes], { type: "application/octet-stream" });
+            downloadAudio(errorBlob, "debug_audio.bin");
+        });
+        downloadAudio(audioBlob, "reply.wav");
+    } catch (e) {
+        console.error("Audio playback error:", e);
+        toast("音频播放失败: " + e.message);
+    }
+};
+
+function downloadAudio(blob, filename) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+    /* ================= 语音合成（本地备用） ================= */
+    let voices = [];
+    const synth = window.speechSynthesis;
+    const loadVoices = () => {
+      voices = synth.getVoices();
+      const sel = $("#voiceSelect");
+      sel.innerHTML = "";
+      voices.forEach(v => {
+        const o = document.createElement("option");
+        o.value = v.name;
+        o.textContent = `${v.name} (${v.lang})`;
+        sel.appendChild(o);
+      });
+      const prefer = voices.find(v => /^zh/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang));
+      if (prefer) sel.value = prefer.name;
+    };
+    synth.onvoiceschanged = () => loadVoices();
+    const getVoice = () => voices.find(v => v.name === $("#voiceSelect").value) || voices[0];
+
+    /* ================= 事件绑定 ================= */
+    const bind = () => {
+      $("#btnNew").addEventListener("click", async () => {
+        try {
+          const remote = await createRemoteSession("新的对话");
+          const s = { id: remote.id, name: remote.title, createdAt: now(), updatedAt: now(), messages: [] };
+          state.sessions.unshift(s);
+          save();
+          selectSession(s.id);
+        } catch (e) {
+          toast("新建对话失败: " + e.message);
+        }
+      });
+      $("#btnExport").addEventListener("click", () => {
+        const blob = new Blob([JSON.stringify(state.sessions, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `ai_sessions_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+      $("#btnClearAll").addEventListener("click", () => {
+        if (confirm("确认清空所有会话？")) {
+          state.sessions = [];
+          save();
+          $("#btnNew").click();
+        }
+      });
+      $("#searchInput").addEventListener("input", renderHistory);
+      $("#convTitle").addEventListener("input", (e) => renameCurrent(e.target.value));
+      $("#btnSend").addEventListener("click", () => send());
+      $("#input").addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          send();
+        }
+      });
+      $("#btnStopSpeak").addEventListener("click", () => {
+        const audio = document.querySelector("audio");
+        if (audio) audio.pause();
+      });
+      $("#btnMute").addEventListener("click", () => {
+        state.speakingMuted = !state.speakingMuted;
+        $("#btnMute").textContent = state.speakingMuted ? "恢复" : "静音";
+        toast(state.speakingMuted ? "已静音" : "已恢复播报");
+      });
+      $("#btnReloadVoices").addEventListener("click", loadVoices);
+      $("#spkSend").addEventListener("click", () => {
+        if (state.isSending) {
+          toast("正在发送，请稍候");
+          return;
+        }
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = "audio/*";
+        fileInput.onchange = (e) => {
+          $("#spkSend").files = e.target.files;
+          send();
+        };
+        fileInput.click();
+      });
+      $("#chat").addEventListener("dblclick", () => {
+        const s = findSession(state.currentId);
+        if (!s) return;
+        const lastAI = [...s.messages].reverse().find(m => m.role === "assistant");
+        if (lastAI && lastAI.audio) playAudioFromServer(lastAI.audio);
+      });
+      $("#btnLogout").addEventListener("click", () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        state.token = null;
+        state.username = null;
+        $("#username").textContent = "未登录";
+        showModal();
+        toast("已注销");
+      });
+      $("#loginBtn").addEventListener("click", login);
+      $("#registerBtn").addEventListener("click", register);
+    };
+
+    /* ================= 登录/注册 ================= */
+    function showModal() {
+      $("#loginModal").style.display = "block";
+    }
+    async function register() {
+      if (state.isLoggingIn) {
+        toast("正在注册，请稍候");
+        return;
+      }
+      state.isLoggingIn = true;
+      $("#registerBtn").disabled = true;
+      const username = $("#loginUsername").value;
+      const password = $("#password").value;
+      const byteLength = new TextEncoder().encode(password).length;
+      console.log("Register attempt:", { username, password, byteLength, passwordChars: password.split('') });
+      if (byteLength > 72) {
+        toast("密码长度不能超过72字节");
+        state.isLoggingIn = false;
+        $("#registerBtn").disabled = false;
+        return;
+      }
+      try {
+        const res = await fetch(`${API_ENDPOINT}/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+        if (res.ok) {
+          toast("注册成功，请登录");
+        } else {
+          const errorText = await res.text();
+          console.error("Register failed:", errorText);
+          toast("注册失败: " + errorText);
+        }
+      } catch (err) {
+        console.error("Register error:", err.message);
+        toast("注册失败: 网络错误");
+      } finally {
+        state.isLoggingIn = false;
+        $("#registerBtn").disabled = false;
+      }
+    }
+    async function login() {
+      if (state.isLoggingIn) {
+        toast("正在登录，请稍候");
+        return;
+      }
+      state.isLoggingIn = true;
+      $("#loginBtn").disabled = true;
+      const username = $("#loginUsername").value;
+      const password = $("#password").value;
+      console.log("Login attempt:", { username });
+      try {
+        const res = await fetch(`${API_ENDPOINT}/token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          state.token = data.access_token;
+          state.username = username;
+          localStorage.setItem('token', state.token);
+          localStorage.setItem('username', username);
+          $("#username").textContent = username;
+          console.log("Login successful, username set:", username);
+          closeModal();
+          toast("登录成功");
+          await syncConversations();
+          if (!state.sessions.length || !state.currentId) {
+            try {
+              const remote = await createRemoteSession("新的对话");
+              const s = { id: remote.id, name: remote.title, createdAt: now(), updatedAt: now(), messages: [] };
+              state.sessions.unshift(s);
+              s.messages.push({ role: "assistant", content: "你好，我是你的 AI 导师。有什么想聊的？", time: now() });
+              save();
+              selectSession(s.id);
+            } catch (e) {
+              toast("初始化会话失败: " + e.message);
+              const s = { id: "s_fallback", name: "新的对话", createdAt: now(), updatedAt: now(), messages: [] };
+              state.sessions.unshift(s);
+              save();
+              selectSession(s.id);
+            }
+          } else {
+            selectSession(state.currentId || state.sessions[0].id);
+          }
+          renderHistory();
+        } else {
+          const errorText = await res.text();
+          console.error("Login failed:", errorText);
+          toast("登录失败: " + errorText);
+        }
+      } catch (err) {
+        console.error("Login error:", err.message);
+        toast("登录失败: 网络错误");
+      } finally {
+        state.isLoggingIn = false;
+        $("#loginBtn").disabled = false;
+      }
+    }
+    function closeModal() {
+      $("#loginModal").style.display = "none";
+    }
+
+    /* ================= 启动 ================= */
+    (async function init() {
+      bind();
+      loadVoices();
+      try { state.sessions = JSON.parse(localStorage.getItem(storeKey) || "[]"); } catch { state.sessions = []; }
+      if (state.username) {
+        $("#username").textContent = state.username;
+        console.log("Restored username from localStorage:", state.username);
+      }
+      if (!state.token || !(await validateToken(state.token))) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        state.token = null;
+        state.username = null;
+        $("#username").textContent = "未登录";
+        showModal();
+        return;
+      }
+      await syncConversations();
+      if (!state.sessions.length || !state.currentId) {
+        try {
+          const remote = await createRemoteSession("新的对话");
+          const s = { id: remote.id, name: remote.title, createdAt: now(), updatedAt: now(), messages: [] };
+          state.sessions.unshift(s);
+          s.messages.push({ role: "assistant", content: "你好，我是你的 AI 导师。有什么想聊的？", time: now() });
+          save();
+          selectSession(s.id);
+        } catch (e) {
+          toast("初始化会话失败: " + e.message);
+          const s = { id: "s_fallback", name: "新的对话", createdAt: now(), updatedAt: now(), messages: [] };
+          state.sessions.unshift(s);
+          save();
+          selectSession(s.id);
+        }
+      } else {
+        selectSession(state.currentId || state.sessions[0].id);
+      }
+      renderHistory();
+    })();
+  </script>
+</body>
+</html>
