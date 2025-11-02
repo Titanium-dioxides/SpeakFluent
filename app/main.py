@@ -1,32 +1,41 @@
-# app/main.py
-from app.logging_config import logger
-from fastapi import FastAPI
-from app.routes import router as routes_router
-from app.dependencies import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
+# main.py
+from fastapi import FastAPI, Form          # ← 新增 Form（OAuth2PasswordRequestForm 必须）
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
+from fastapi.staticfiles import StaticFiles
+import os
 
-app = FastAPI(title="Oral Trainer App", description="A voice-based conversational AI application", version="1.0.0")
+# ---------- 导入两个 router ----------
+from app.auth import router as auth_router          # 认证相关
+from app.routes import router as conv_router        # 会话、chat 等（你贴的那段代码所在的文件）
 
+app = FastAPI()
+
+# ---------- CORS ----------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8000/static", "http://127.0.0.1:8000/static", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
-app.include_router(routes_router)
+# ---------- 静态文件 ----------
+static_dir = "./static"
+images_dir = os.path.join(static_dir, "images")
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+if not os.path.exists(static_dir):
+    raise RuntimeError(f"Directory '{static_dir}' does not exist. Please create it and add 'index.html'.")
+if not os.path.exists(images_dir):
+    raise RuntimeError(f"Directory '{images_dir}' does not exist. Please create it and add 'OIP-C.webp'.")
 
-if __name__ == "__main__":
-    try:
-        logger.info("Starting server with Uvicorn...")
-        uvicorn.run(app, host="0.0.0.0", port=8000, reload=True, log_level="debug")
-    except Exception as e:
-        logger.error(f"Server failed to start: {str(e)}", exc_info=True)
-        raise
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+# ---------- 挂载路由 ----------
+app.include_router(auth_router)   # /register、/token、/me …
+app.include_router(conv_router)   # /conversations、/conversations/{id}/chat …
+
+# ---------- OPTIONS 预检（可选） ----------
+@app.options("/register")
+async def options_register():
+    return {"message": "CORS preflight handled"}

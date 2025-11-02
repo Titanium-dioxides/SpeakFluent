@@ -4,14 +4,17 @@ import asyncio  # 异步I/O库
 import json  # JSON数据处理库
 import logging  # 日志记录库
 
+
+
 # 配置日志记录
 logging.basicConfig(level=logging.INFO)  # 设置日志级别为INFO
 logger = logging.getLogger(__name__)  # 创建当前模块的日志记录器
 
+
+
 # 定义常量
 OLLAMA_URL = "http://localhost:11434/api/generate"  # Ollama API的URL
 MODEL_NAME = "qwen2.5:0.5b"  # 使用的模型名称
-
 
 async def generate_response(prompt: str, history: str = "") -> str:
     """
