@@ -1,3 +1,6 @@
+"""
+FastAPI 路由模块，提供用户认证和对话管理的 API 端点
+"""
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File,Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -12,13 +15,15 @@ from app.llm import generate_response
 from app.stt import speech_to_text
 from app.tts import text_to_speech
 
+# 配置日志记录
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# 创建路由实例
 router = APIRouter()
 @router.post("/register")
-async def register(user: UserCreate,                    # 请求体
-                   request: Request,                    # 依赖
+async def register(user: UserCreate,                    # 请求体：用户注册数据
+                   request: Request,                    # 依赖：HTTP 请求对象
                    db: AsyncSession = Depends(get_db)): # 依赖    # ← 加这一行
     logger.info(f"Content-Type: {request.headers.get('content-type')}")
     logger.info(f"Raw body: {await request.body()}")
