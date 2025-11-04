@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Speakfluent——AI让英语对话更流畅</title>
+  <style>
+    /*这里是提示用户可以选择不再弹出提示词*/
+    /* 添加模态窗口的样式 */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.4);
+    }
+
+    .modal-content {
+      background-color: #fefefe;
+      margin: 15% auto;
+      padding: 20px;
+      border: 1px solid #000000;
+      width: 80%;
+      max-width: 500px;
+      border-radius: 10px;
+    }
+
+    .close {
+      color: #000000;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .close:hover,
+    .close:focus {
+      color: black;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .modal-content p, .modal-content ol, .modal-content li {
+      color: black;
+    }
+
+
+
+    :root{
+      --bg:#0f172a; --soft:#0b1220; --text:#e5e7eb; --muted:#94a3b8;
+      --accent:#38bdf8; --ring:#22d3ee; --shadow:0 6px 24px rgba(0,0,0,.25);
+      --sb-thumb:#274470; --sb-thumb-hover:#3a6aa3;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:linear-gradient(180deg,#0b1020,var(--bg));
+      color:var(--text);
+      font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Helvetica Neue",Arial,"Noto Sans CJK SC",sans-serif;
+      /* 页面本身不滚动，由内部模块滚 */
+      overflow:hidden;
+    }
+
+    /* 布局：整页占满视口，高度锁定，内部模块滚动 */
+    .app{
+      display:grid; grid-template-columns:300px 1fr; height:100vh; width:100vw;
+    }
+
+    /* 左侧栏整体不滚，内部的 .history 滚 */
+    .sidebar{
+      background:linear-gradient(180deg,var(--soft),#0b0f1a);
+      border-right:1px solid #1f2a44;
+      display:flex; flex-direction:column; gap:12px; padding:16px;
+      overflow:hidden;                 /* 把滚动交给 .history */
+    }
+    .brand{display:flex; align-items:center; gap:10px; padding:6px 8px;}
+    .brand .logo{
+      width:28px;height:28px;border-radius:8px;display:grid;place-items:center;
+      background:linear-gradient(135deg,#22d3ee,#0ea5e9); color:#001018;font-weight:800;box-shadow:var(--shadow);
+    }
+    .title{font-weight:700}
+    .toolbar{display:flex; gap:8px; flex-wrap:wrap}
+    .btn{
+      background:#0f172a;border:1px solid #1f2a44;border-radius:10px;color:var(--text);
+      padding:8px 10px; cursor:pointer; transition:.15s; user-select:none
+    }
+    .btn:hover{border-color:#274470; transform:translateY(-1px)}
+    .btn.primary{background:linear-gradient(135deg,#0ea5e9,#22d3ee); color:#06121b; font-weight:700}
+    .btn.ghost{background:transparent}
+    .btn.danger{border-color:#4b1d1d; color:#fecaca}
+    .search input{
+      width:100%; background:#0f172a; border:1px solid #1f2a44; color:var(--text);
+      padding:10px 12px; border-radius:10px; outline:none; transition:.15s
+    }
+    .search input:focus{border-color:#274470; box-shadow:0 0 0 3px #0ea5e933}
+
+    /* 只有历史列表滚动 */
+    .history{
+      flex:1; margin-top:6px; padding-right:2px;
+      overflow-y:auto; overflow-x:hidden;
+      scrollbar-gutter:stable both-edges;
+      -webkit-overflow-scrolling:touch;
+      position:relative; z-index:0;
+    }
+    .session{
+      display:flex; align-items:center; gap:8px; padding:10px; border-radius:10px;
+      cursor:pointer; transition:.12s; border:1px solid transparent;
+    }
+    .session:hover{background:#0f172a; border-color:#1f2a44}
+    .session.active{background:#0e2533; border-color:#1a4f63}
+    .session .name{flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .session .time{color:var(--muted); font-size:12px}
+
+    /* 右侧主区：自身不滚，由内部聊天区滚 */
+    .main{
+      display:grid; grid-template-rows:auto 1fr auto;
+      height:100vh; overflow:hidden;     /* 关键：防止内部块溢出覆盖按钮 */
+      position:relative;
+    }
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:14px 18px; border-bottom:1px solid #16223b; background:rgba(0,0,0,.15);
+      position:relative; z-index:2;      /* 确保不被聊天层覆盖 */
+    }
+    .conv-title{display:flex; align-items:center; gap:10px; font-weight:700}
+    .conv-title input{
+      background:transparent; border:1px dashed transparent; color:var(--text);
+      padding:4px 6px; border-radius:8px; font-weight:700; font-size:16px; width:min(46vw,520px)
+    }
+    .conv-title input:focus{border-color:#274470; outline:none; background:#0b1624}
+
+    .voice-panel{display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end;}
+    .voice-panel .field{display:flex; align-items:center; gap:6px}
+    select, input[type="range"]{
+      background:#0f172a; color:var(--text); border:1px solid #1f2a44; border-radius:10px; padding:8px;
+      outline:none; transition:.15s
+    }
+    select:focus, input[type="range"]:focus{box-shadow:0 0 0 3px #0ea5e933; border-color:#274470}
+
+    /* 聊天区滚动（独立滚动条） */
+    .chat{
+      overflow-y:auto; overflow-x:hidden;
+      padding:20px 24px 24px; scroll-behavior:smooth;
+      background:radial-gradient(600px 200px at 30% -10%,#08334440,transparent);
+      scrollbar-gutter:stable both-edges;
+      -webkit-overflow-scrolling:touch;
+      position:relative; z-index:1;  /* 低于 topbar / composer，避免遮挡按钮 */
+    }
+    .msg{display:grid; grid-template-columns: 36px 1fr; gap:12px; margin:8px 0; align-items:flex-start}
+    .avatar{width:36px; height:36px; border-radius:10px; display:grid; place-items:center; font-weight:800}
+    .avatar.user{background:#334155; color:#e2e8f0}
+    .avatar.ai{background:linear-gradient(135deg,#0ea5e9,#22d3ee); color:#04121a}
+    .bubble{background:#1f2937; border:1px solid #1f2a44; border-radius:14px; padding:12px 14px; box-shadow:var(--shadow)}
+    .bubble.ai{background:#0ea5e91a; border-color:#184a5c}
+    .bubble .meta{font-size:12px; color:var(--muted); margin-bottom:6px}
+    .bubble .tools{display:flex; gap:8px; opacity:.9; margin-top:6px}
+    .bubble .tools button{background:transparent; border:1px solid #1f2a44; color:var(--text); padding:4px 8px; border-radius:8px; cursor:pointer}
+
+    /* 底部输入区固定在主区内部，主区不滚 */
+    .composer{
+      display:grid; grid-template-columns:1fr auto auto; gap:10px; padding:14px 18px; border-top:1px solid #16223b;
+      background:linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.25));
+      position:relative; z-index:2;   /* 确保在最上层，可点 */
+    }
+    .input-wrap{
+      display:flex; align-items:center; background:#0f172a; border:1px solid #1f2a44; border-radius:14px; padding:8px 10px; box-shadow:var(--shadow)
+    }
+    textarea{flex:1; resize:none; background:transparent; border:none; color:#e5e7eb; outline:none; font:inherit; padding:6px 8px; height:56px}
+    .send{min-width:120px; background:linear-gradient(135deg,#0ea5e9,#22d3ee); color:#03131c; font-weight:800; border:none; border-radius:12px; padding:14px 18px; cursor:pointer; box-shadow:var(--shadow)}
+
+    .muted{color:var(--muted)}
+    .empty{margin:40px auto; max-width:680px; text-align:center; color:var(--muted); padding:24px; background:#0f172a; border:1px dashed #223155; border-radius:16px}
+
+    @media (max-width:980px){
+      .app{grid-template-columns:1fr}
+      .sidebar{display:none}
+      .voice-panel{justify-content:flex-start}
+    }
+
+    /* 统一滚动条样式（各模块都生效） */
+    *{scrollbar-width:thin; scrollbar-color:var(--sb-thumb) transparent;}
+    ::-webkit-scrollbar{width:10px; height:10px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--sb-thumb); border-radius:8px; border:2px solid transparent; background-clip:content-box}
+    ::-webkit-scrollbar-thumb:hover{background:var(--sb-thumb-hover)}
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <!-- 左侧：历史会话（内部滚动：.history） -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="logo">SF</div>
+        <div>
+          <div class="title">Speakfluent——AI让英语对话更流畅</div>
+          <div class="muted">历史可续聊 · 模块独立滚动</div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn primary" id="btnNew">新建对话</button>
+        <button class="btn ghost" id="btnExport">导出全部</button>
+        <button class="btn danger" id="btnClearAll">清空</button>
+      </div>
+
+      <div class="search" style="margin-top:6px">
+        <input id="searchInput" placeholder="搜索历史会话…" />
+      </div>
+
+      <div class="history" id="history"></div>
+      <div class="muted" style="font-size:12px">数据保存在 <code>localStorage</code>。</div>
+    </aside>
+
+    <!-- 右侧：主区域（内部滚：.chat） -->
+    <main class="main">
+      <div class="topbar">
+        <div class="conv-title">
+          <span class="muted">会话标题：</span>
+          <input id="convTitle" value="新的对话" />
+        </div>
+        <div class="voice-panel">
+          <label title="开启后，AI 回复将自动播报" style="display:flex;gap:8px;align-items:center">
+            <input type="checkbox" id="toggleSpeak" checked>
+            <span>自动播报</span>
+          </label>
+          <div class="field"><span class="muted">发音人</span>
+            <select id="voiceSelect"></select>
+            <button class="btn ghost" id="btnReloadVoices">刷新声音</button>
+          </div>
+          <div class="field"><span class="muted">语速</span><input id="rate" type="range" min="0.5" max="2" step="0.05" value="1"></div>
+          <div class="field"><span class="muted">音调</span><input id="pitch" type="range" min="0" max="2" step="0.05" value="1"></div>
+          <div class="field"><span class="muted">音量</span><input id="volume" type="range" min="0" max="1" step="0.05" value="1"></div>
+          <button class="btn ghost" id="btnStopSpeak">停止</button>
+          <button class="btn ghost" id="btnMute">静音</button>
+        </div>
+      </div>
+
+      <div class="chat" id="chat">
+        <div class="empty">👋 发消息试试。这里是**聊天区的独立滚动条**。</div>
+      </div>
+
+      <div class="composer">
+        <div class="input-wrap"><textarea id="input" placeholder="输入内容，Shift+Enter 换行…"></textarea></div>
+        <button class="send" id="btnSend">发送</button>
+        <button class="send" id="toggle-recognition">
+          <img src="OIP-C.webp" alt="点击说话" width="50px">
+        </button>
+        <div style="margin-top: 10px;">
+          <label for="language-select">请选择您要说的语言：</label>
+          <select id="language-select">
+            <option value="zh-CN">中文</option>
+            <option value="en-US">英文</option>
+          </select>
+          <div id="recognitionStatus" style="color: var(--muted); font-size: 12px; grid-column: 1/-1; margin-top: 4px; height: 16px;"></div>
+        </div>
+        <div id="transcript" style="display:none;"></div>
+        <script src="voice_input.js"></script>
+      </div>
+    </main>
+  </div>
+  <!-- 添加模态窗口 -->
+  <div id="myModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <p>提示：如果希望本次打开时不再提示麦克风权限请求，请按照以下步骤操作：</p>
+      <ol>
+        <li>点击浏览器右上角的三个点图标，选择“设置”。</li>
+        <li>在设置中，选择“隐私、搜索和服务”。</li>
+        <li>在“网站权限”区域，点击“麦克风”。</li>
+        <li>确保“允许网站使用你的麦克风”开关为开启状态。</li>
+        <li>在“允许”列表中，添加当前网站的域名。</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    // 弹出模态窗口
+    window.onload = function() {
+      var modal = document.getElementById("myModal");
+      var span = document.getElementsByClassName("close")[0];
+
+      modal.style.display = "block";
+
+      span.onclick = function() {
+        modal.style.display = "none";
+      };
+
+      window.onclick = function(event) {
+        if (event.target == modal) {
+          modal.style.display = "none";
+        }
+      };
+    };
+  </script>
+
+  <script>
+    /* ================= 配置 ================= */
+    const API_ENDPOINT = "API link xxx";  // ←← 替换为你的后端接口
+
+    /* ================= 状态 ================= */
+    const storeKey = "ai_tutor_sessions_v1";
+    const state = { sessions: [], currentId: null, speakingMuted:false };
+
+    /* ================= 工具 ================= */
+    const $ = (s,r=document)=>r.querySelector(s);
+    const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+    const now = ()=>Date.now();
+    const uuid = ()=>"s_"+Math.random().toString(36).slice(2,10)+Date.now().toString(36);
+    const fmt = t=>new Date(t).toLocaleString();
+    const save = ()=>localStorage.setItem(storeKey, JSON.stringify(state.sessions));
+    const escapeHTML = (str="")=>str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    const toast = (msg, dur=1600) => { const t=document.createElement("div");
+      t.textContent=msg; Object.assign(t.style,{position:"fixed",left:"50%",top:"10%",transform:"translateX(-50%)",
+      background:"#0b1624",color:"#e5e7eb",border:"1px solid #1f2a44",padding:"10px 14px",borderRadius:"10px",zIndex:9999,boxShadow:"var(--shadow)"}); document.body.appendChild(t);
+      setTimeout(()=>t.remove(),dur);
+    };
+
+    /* ============ 数据&渲染（稳定事件绑定） ============ */
+    const createSession = (name="新的对话")=>{
+      const s={id:uuid(), name, createdAt:now(), updatedAt:now(), messages:[]};
+      state.sessions.unshift(s); save(); renderHistory(); return s;
+    };
+    const findSession=id=>state.sessions.find(s=>s.id===id);
+    const selectSession=id=>{
+      state.currentId=id; renderHistory(); renderChat();
+      const s=findSession(id); $("#convTitle").value=s?.name||"新的对话"; document.title=s?.name?`${s.name} · AI 导师`:"AI 导师";
+    };
+    const renameCurrent = (title)=>{
+      const s=findSession(state.currentId); if(!s) return;
+      s.name=title.trim()||"未命名对话"; s.updatedAt=now(); save(); renderHistory();
+    };
+    const deleteSession=id=>{
+      const i=state.sessions.findIndex(s=>s.id===id);
+      if(i>=0){ state.sessions.splice(i,1); save();
+        if(state.currentId===id){ const s=state.sessions[0]||createSession("新的对话"); selectSession(s.id); }
+        else renderHistory();
+      }
+    };
+
+    const renderHistory=()=>{
+      const box=$("#history"); const q=($("#searchInput").value||"").toLowerCase(); box.innerHTML="";
+      state.sessions.filter(s=>!q||s.name.toLowerCase().includes(q))
+        .sort((a,b)=>b.updatedAt-a.updatedAt)
+        .forEach(s=>{
+          const el=document.createElement("div");
+          el.className="session"+(state.currentId===s.id?" active":"");
+          el.innerHTML=`<div class="name" title="${s.name}">${s.name}</div><div class="time">${new Date(s.updatedAt).toLocaleDateString()}</div>`;
+          el.addEventListener("click", ()=>selectSession(s.id));
+          el.addEventListener("contextmenu", (e)=>{e.preventDefault(); if(confirm(`删除《${s.name}》？`)) deleteSession(s.id);});
+          box.appendChild(el);
+        });
+    };
+
+    const msgHTML=(m,i)=>{
+      const isAI=m.role==="assistant";
+      const role=isAI?"ai":(m.role==="error"?"ai":"user");
+      const meta=`${isAI?"AI":(m.role==="error"?"系统":"你")} · ${fmt(m.time)}`;
+      const tools=isAI?`<div class="tools">
+        <button data-act="speak" data-idx="${i}">朗读</button>
+        <button data-act="copy"  data-idx="${i}">复制</button>
+        <button data-act="regen" data-idx="${i}">重试</button>
+      </div>`:"";
+      return `<div class="msg">
+        <div class="avatar ${role}">${isAI?"AI":"你"}</div>
+        <div class="bubble ${isAI?"ai":""}">
+          <div class="meta">${meta}</div>
+          <div class="content">${escapeHTML(m.content).replace(/\n/g,"<br/>")}</div>
+          ${tools}
+        </div>
+      </div>`;
+    };
+
+    const renderChat=()=>{
+      const s=findSession(state.currentId); const box=$("#chat");
+      if(!s||!s.messages.length){ box.innerHTML=`<div class="empty">暂无消息。开始聊天吧！</div>`; return; }
+      box.innerHTML=s.messages.map((m,i)=>msgHTML(m,i)).join("");
+
+      /* 事件采用委托，防止多次渲染后按钮失效 */
+      box.querySelectorAll(".tools button").forEach(btn=>{
+        btn.addEventListener("click", (e)=>{
+          const idx=+e.currentTarget.dataset.idx;
+          const act=e.currentTarget.dataset.act;
+          if(act==="copy") { navigator.clipboard.writeText(s.messages[idx].content).then(()=>toast("已复制")); }
+          if(act==="regen"){ const k=findPrevUserIndex(s.messages,idx); if(k>=0) send(s.messages[k].content,true); }
+          if(act==="speak") speakText(s.messages[idx].content);
+        });
+      });
+
+      box.scrollTop=box.scrollHeight+400;   // 仅滚聊天区
+    };
+
+    const findPrevUserIndex=(msgs,from)=>{ for(let i=from;i>=0;i--) if(msgs[i].role==="user") return i; return -1; };
+
+    /* ============ 发送 & 调后端（失败也不影响按钮） ============ */
+    let isSending = false; // 添加一个标志来防止重复发送
+    const addMessage=(role,content)=>{
+      const s=findSession(state.currentId); if(!s) return;
+      s.messages.push({role,content,time:now()}); s.updatedAt=now(); save(); renderChat();
+    };
+
+    const send=async (text,isRetry=false)=>{
+      console.log("Sending message:", text);
+
+      if (isSending) return; // 如果已经在发送中，则不执行
+      isSending = true;
+
+      const content=(text||$("#input").value||"").trim(); if(!content) return;
+      if (!content) {
+        isSending = false;
+        return;
+      }
+      const s=findSession(state.currentId); if(!s) return;
+      if (!s) {
+        isSending = false;
+        return;
+      }
+      if(s.messages.filter(m=>m.role==="user").length===0) renameCurrent(content.slice(0,20));
+      if(!isRetry) addMessage("user",content);
+
+      const tempId=uuid(); 
+      s.messages.push({role:"assistant",content:"正在思考…",time:now(),tempId}); 
+      save(); 
+      renderChat();
+      $("#input").value="";
+      $("#input").focus();
+
+      try{
+        const payload = { conversationId: s.id, message: content, history: s.messages.slice(-21).map(m => ({ role: m.role, content: m.content })) };
+        const res = await fetch(API_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        if (!res.ok) throw new Error(`接口失败：${res.status} ${res.statusText}`);
+        const data = await res.json();
+        handleAIResponse(tempId, data);
+      } catch (err) {
+        replaceThinkingWithError(tempId, err.message || "请求失败");
+      } finally {
+        isSending = false; // 确保在发送完成后重置标志
+      }
+    };
+
+   const handleAIResponse = (tempId, data) => {
+      const s = findSession(state.currentId);
+      if (!s) return;
+      let text = data?.reply || data?.text;
+      if (!text && Array.isArray(data?.choices) && data.choices[0]?.message?.content) {
+        text = data.choices[0].message.content;
+      }
+      if (!text) text = "[后端未返回有效回复]";
+      const i = s.messages.findIndex(m => m.tempId === tempId);
+      if (i >= 0) {
+        s.messages[i] = { role: "assistant", content: text, time: now() };
+      } else {
+        s.messages.push({ role: "assistant", content: text, time: now() });
+      }
+      s.updatedAt = now();
+      save();
+      renderChat();
+      if ($("#toggleSpeak").checked && !state.speakingMuted) speakText(text);
+    };
+
+
+    const replaceThinkingWithError=(tempId,msg)=>{
+      const s=findSession(state.currentId); if(!s) return;
+      const i=s.messages.findIndex(m=>m.tempId===tempId);
+      const t=`❌ 出错：${msg}`;
+      if(i>=0) s.messages[i]={role:"error",content:t,time:now()}; else s.messages.push({role:"error",content:t,time:now()});
+      s.updatedAt=now(); save(); renderChat();
+    };
+
+    
+    /* ============ 绑定一次即可（不重复） ============ */
+    const bind=()=>{
+      $("#btnNew").addEventListener("click", () => { const s = createSession("新的对话"); selectSession(s.id); });
+      $("#btnExport").addEventListener("click", () => {
+        const blob = new Blob([JSON.stringify(state.sessions, null, 2)], { type: "application/json" });
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+        a.download = `ai_sessions_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`; a.click(); URL.revokeObjectURL(a.href);
+      });
+      $("#btnClearAll").addEventListener("click", () => {
+        if (confirm("确认清空所有会话？")) { state.sessions = []; save(); const s = createSession("新的对话"); selectSession(s.id); }
+      });
+      $("#searchInput").addEventListener("input", renderHistory);
+      $("#convTitle").addEventListener("input", (e) => renameCurrent(e.target.value));
+      $("#btnSend").addEventListener("click", () => send());
+      $("#input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send();inputTextarea.value = ''; }});
+      $("#btnStopSpeak").addEventListener("click", () => synth.cancel());
+      $("#btnMute").addEventListener("click", () => {
+        state.speakingMuted = !state.speakingMuted;
+        $("#btnMute").textContent = state.speakingMuted ? "恢复" : "静音";
+        toast(state.speakingMuted ? "已静音" : "已恢复播报");
+      });
+      $("#btnReloadVoices").addEventListener("click", loadVoices);
+      $("#chat").addEventListener("dblclick", () => {
+        const s = findSession(state.currentId); if (!s) return;
+        const lastAI = [...s.messages].reverse().find(m => m.role === "assistant");
+        if (lastAI) speakText(lastAI.content);
+      });
+    };
+
+    /* ============ 启动 ============ */
+    (function init(){
+      bind(); loadVoices();
+      try{ state.sessions=JSON.parse(localStorage.getItem(storeKey)||"[]"); }catch{ state.sessions=[]; }
+      if(!state.sessions.length){
+        const s=createSession("新的对话");
+        s.messages.push({role:"assistant",content:"你好，我是你的 AI 导师。有什么想聊的？",time:now()});
+        selectSession(s.id);
+      }else{
+        selectSession(state.sessions[0].id);
+      }
+      renderHistory();
+    })();
+  </script>
+</body>
+</html>
