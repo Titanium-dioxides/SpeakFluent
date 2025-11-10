@@ -6,7 +6,7 @@ from io import BytesIO  # 导入BytesIO，用于在内存中处理二进制数�
 
 async def text_to_speech(text: str) -> bytes:
     """
-    使用 Microsoft Edge TTS 将文本转为语音（WAV bytes）
+    使用 Microsoft Edge TTS 将文本转为语音（W AV bytes）
     参数:
         text (str): 需要转换为语音的文本内容
     返回:
