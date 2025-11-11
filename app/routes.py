@@ -1,6 +1,4 @@
-"""
-FastAPI 路由模块，提供用户认证和对话管理的 API 端点
-"""
+#app/routes.py
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File,Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -15,29 +13,11 @@ from app.llm import generate_response
 from app.stt import speech_to_text
 from app.tts import text_to_speech
 
-# 配置日志记录
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 创建路由实例
 router = APIRouter()
-@router.post("/register")
-async def register(user: UserCreate,                    # 请求体：用户注册数据
-                   request: Request,                    # 依赖：HTTP 请求对象
-                   db: AsyncSession = Depends(get_db)): # 依赖    # ← 加这一行
-    logger.info(f"Content-Type: {request.headers.get('content-type')}")
-    logger.info(f"Raw body: {await request.body()}")
-    logger.info(f"Parsed user.password = {repr(user.password)}")
-    await create_user(db, user)
-    return {"msg": "用户注册成功"}
-@router.post("/token", response_model=Token)
-async def login(user: UserLogin, db: AsyncSession = Depends(get_db)):
-    authenticated = await authenticate_user(db, user.username, user.password)
-    if not authenticated:
-        raise HTTPException(status_code=400, detail="用户名或密码错误")
-    access_token_expires = timedelta(minutes=30)
-    access_token = create_access_token(data={"sub": authenticated.username}, expires_delta=access_token_expires)
-    return {"access_token": access_token, "token_type": "bearer"}
+
 
 @router.post("/conversations")
 async def create_conversation(conv: ConversationCreate, current_user: User = Depends(get_current_user),
@@ -55,7 +35,7 @@ async def get_conversations(current_user: User = Depends(get_current_user), db: 
     return [ConvSchema(id=c.id, title=c.title) for c in convs]
 
 @router.get("/conversations/{conv_id}")
-async def get_conversation(conv_id: str, current_user: User = Depends(get_current_user),
+async def get_conversation(conv_id: int, current_user: User = Depends(get_current_user),
                            db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Conversation).where(Conversation.id == conv_id, Conversation.user_id == current_user.id))
@@ -66,7 +46,7 @@ async def get_conversation(conv_id: str, current_user: User = Depends(get_curren
 
 @router.post("/conversations/{conv_id}/chat")
 async def chat(
-    conv_id: str,
+    conv_id: int,
     text: Optional[str] = None,
     audio: UploadFile = File(None),
     current_user: User = Depends(get_current_user),
@@ -106,3 +86,22 @@ async def chat(
     # 合成音频
     audio_bytes = await text_to_speech(assistant_text)
     return {"reply": assistant_text, "audio": audio_bytes.hex()}
+
+@router.delete("/conversations/{conv_id}")
+async def delete_conversation(
+    conv_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # 先按 ID 查是否存在
+    any_result = await db.execute(select(Conversation).where(Conversation.id == conv_id))
+    any_conv = any_result.scalar_one_or_none()
+    if not any_conv:
+        raise HTTPException(status_code=404, detail="对话未找到")
+    # 再校验归属
+    if any_conv.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权删除该对话")
+    conv = any_conv
+    await db.delete(conv)
+    await db.commit()
+    return {"status": "ok"}

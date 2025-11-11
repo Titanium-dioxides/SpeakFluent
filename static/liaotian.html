@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文字转语音模块</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .tts-container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+
+        .tts-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .tts-header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .tts-header p {
+            color: #666;
+        }
+
+        .text-input-section {
+            margin-bottom: 30px;
+        }
+
+        .text-input {
+            width: 100%;
+            height: 120px;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .controls-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .voice-controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .control-group select,
+        .control-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .range-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .range-control input {
+            flex: 1;
+        }
+
+        .range-value {
+            min-width: 40px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .status-section {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: 500;
+        }
+
+        .status.idle {
+            background: #e9ecef;
+            color: #6c757d;
+        }
+
+        .status.speaking {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.paused {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .playback-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .progress-section {
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress {
+            height: 100%;
+            background: #667eea;
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .audio-player {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .sample-texts {
+            margin-top: 30px;
+        }
+
+        .sample-texts h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .sample-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .sample-btn {
+            padding: 8px 16px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .sample-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="tts-container">
+        <div class="tts-header">
+            <h1>文字转语音模块</h1>
+            <p>将文字转换为语音并播放</p>
+        </div>
+
+        <div class="text-input-section">
+            <textarea class="text-input" placeholder="请输入要转换为语音的文字..." id="textInput">
+欢迎使用文字转语音功能！这是一个演示，您可以将任何文字转换为语音播放。支持调整语速、音调和选择不同的语音。
+            </textarea>
+            <div class="controls-section">
+                <button class="btn btn-primary" onclick="speakText()" id="speakBtn">播放语音</button>
+                <button class="btn btn-success" onclick="stopSpeaking()" id="stopBtn" disabled>停止</button>
+                <button class="btn btn-secondary" onclick="pauseSpeaking()" id="pauseBtn" disabled>暂停</button>
+                <button class="btn btn-secondary" onclick="resumeSpeaking()" id="resumeBtn" disabled>继续</button>
+                <button class="btn btn-secondary" onclick="downloadAudio()" id="downloadBtn" disabled>下载音频</button>
+            </div>
+        </div>
+
+        <div class="voice-controls">
+            <div class="control-group">
+                <label for="voiceSelect">选择语音:</label>
+                <select id="voiceSelect" onchange="updateVoice()">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="rateControl">语速:</label>
+                <div class="range-control">
+                    <input type="range" id="rateControl" min="0.5" max="2" step="0.1" value="1" oninput="updateRate()">
+                    <span class="range-value" id="rateValue">1.0</span>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label for="pitchControl">音调:</label>
+                <div class="range-control">
+                    <input type="range" id="pitchControl" min="0.5" max="2" step="0.1" value="1" oninput="updatePitch()">
+                    <span class="range-value" id="pitchValue">1.0</span>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label for="volumeControl">音量:</label>
+                <div class="range-control">
+                    <input type="range" id="volumeControl" min="0" max="1" step="0.1" value="1" oninput="updateVolume()">
+                    <span class="range-value" id="volumeValue">1.0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-section">
+            <div class="status idle" id="status">准备就绪</div>
+        </div>
+
+        <div class="progress-section">
+            <div class="progress-bar">
+                <div class="progress" id="progressBar"></div>
+            </div>
+            <div class="time-display">
+                <span id="currentTime">0:00</span>
+                <span id="totalTime">0:00</span>
+            </div>
+        </div>
+
+        <audio class="audio-player" id="audioPlayer" controls style="display: none;"></audio>
+
+        <div class="sample-texts">
+            <h3>示例文本:</h3>
+            <div class="sample-buttons">
+                <button class="sample-btn" onclick="loadSampleText(0)">欢迎语</button>
+                <button class="sample-btn" onclick="loadSampleText(1)">天气预报</button>
+                <button class="sample-btn" onclick="loadSampleText(2)">新闻摘要</button>
+                <button class="sample-btn" onclick="loadSampleText(3)">诗歌</button>
+                <button class="sample-btn" onclick="loadSampleText(4)">技术说明</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class TextToSpeech {
+            constructor() {
+                this.synthesis = window.speechSynthesis;
+                this.utterance = null;
+                this.isSpeaking = false;
+                this.isPaused = false;
+                this.audioContext = null;
+                this.mediaRecorder = null;
+                this.recordedChunks = [];
+                this.audioBlob = null;
+                
+                this.init();
+            }
+
+            async init() {
+                await this.loadVoices();
+                this.setupEventListeners();
+                this.updateUI();
+            }
+
+            loadVoices() {
+                return new Promise((resolve) => {
+                    // 语音加载完成时的回调
+                    const checkVoices = () => {
+                        const voices = this.synthesis.getVoices();
+                        if (voices.length > 0) {
+                            this.populateVoiceList(voices);
+                            resolve();
+                        }
+                    };
+
+                    // 立即检查一次
+                    checkVoices();
+                    
+                    // 有些浏览器需要等待voiceschanged事件
+                    if (speechSynthesis.onvoiceschanged !== undefined) {
+                        speechSynthesis.onvoiceschanged = checkVoices;
+                    }
+                });
+            }
+
+            populateVoiceList(voices) {
+                const voiceSelect = document.getElementById('voiceSelect');
+                voiceSelect.innerHTML = '';
+                
+                // 筛选中文语音
+                const chineseVoices = voices.filter(voice => 
+                    voice.lang.includes('zh') || voice.lang.includes('cn')
+                );
+                
+                const otherVoices = voices.filter(voice => 
+                    !voice.lang.includes('zh') && !voice.lang.includes('cn')
+                );
+
+                if (chineseVoices.length > 0) {
+                    const chineseGroup = document.createElement('optgroup');
+                    chineseGroup.label = '中文语音';
+                    chineseVoices.forEach(voice => {
+                        const option = document.createElement('option');
+                        option.value = voice.name;
+                        option.textContent = `${voice.name} (${voice.lang})`;
+                        chineseGroup.appendChild(option);
+                    });
+                    voiceSelect.appendChild(chineseGroup);
+                }
+
+                if (otherVoices.length > 0) {
+                    const otherGroup = document.createElement('optgroup');
+                    otherGroup.label = '其他语音';
+                    otherVoices.forEach(voice => {
+                        const option = document.createElement('option');
+                        option.value = voice.name;
+                        option.textContent = `${voice.name} (${voice.lang})`;
+                        otherGroup.appendChild(option);
+                    });
+                    voiceSelect.appendChild(otherGroup);
+                }
+
+                // 默认选择第一个中文语音
+                if (chineseVoices.length > 0) {
+                    voiceSelect.value = chineseVoices[0].name;
+                }
+            }
+
+            setupEventListeners() {
+                // 监听语音合成事件
+                this.synthesis.addEventListener('voiceschanged', () => {
+                    this.loadVoices();
+                });
+            }
+
+            speak(text) {
+                if (this.isSpeaking) {
+                    this.stop();
+                }
+
+                this.utterance = new SpeechSynthesisUtterance(text);
+                
+                // 设置语音参数
+                const selectedVoice = document.getElementById('voiceSelect').value;
+                const voices = this.synthesis.getVoices();
+                const voice = voices.find(v => v.name === selectedVoice);
+                
+                if (voice) {
+                    this.utterance.voice = voice;
+                }
+                
+                this.utterance.rate = parseFloat(document.getElementById('rateControl').value);
+                this.utterance.pitch = parseFloat(document.getElementById('pitchControl').value);
+                this.utterance.volume = parseFloat(document.getElementById('volumeControl').value);
+
+                // 事件监听
+                this.utterance.onstart = () => {
+                    this.isSpeaking = true;
+                    this.isPaused = false;
+                    this.updateUI();
+                    this.updateStatus('语音播放中...', 'speaking');
+                };
+
+                this.utterance.onend = () => {
+                    this.isSpeaking = false;
+                    this.isPaused = false;
+                    this.updateUI();
+                    this.updateStatus('播放完成', 'idle');
+                };
+
+                this.utterance.onerror = (event) => {
+                    console.error('语音合成错误:', event);
+                    this.isSpeaking = false;
+                    this.isPaused = false;
+                    this.updateUI();
+                    this.updateStatus('播放出错', 'idle');
+                };
+
+                this.utterance.onpause = () => {
+                    this.isPaused = true;
+                    this.updateUI();
+                    this.updateStatus('已暂停', 'paused');
+                };
+
+                this.utterance.onresume = () => {
+                    this.isPaused = false;
+                    this.updateUI();
+                    this.updateStatus('语音播放中...', 'speaking');
+                };
+
+                // 开始播放
+                this.synthesis.speak(this.utterance);
+            }
+
+            stop() {
+                if (this.synthesis.speaking) {
+                    this.synthesis.cancel();
+                    this.isSpeaking = false;
+                    this.isPaused = false;
+                    this.updateUI();
+                    this.updateStatus('已停止', 'idle');
+                }
+            }
+
+            pause() {
+                if (this.synthesis.speaking && !this.isPaused) {
+                    this.synthesis.pause();
+                    this.isPaused = true;
+                    this.updateUI();
+                }
+            }
+
+            resume() {
+                if (this.synthesis.speaking && this.isPaused) {
+                    this.synthesis.resume();
+                    this.isPaused = false;
+                    this.updateUI();
+                }
+            }
+
+            updateUI() {
+                const speakBtn = document.getElementById('speakBtn');
+                const stopBtn = document.getElementById('stopBtn');
+                const pauseBtn = document.getElementById('pauseBtn');
+                const resumeBtn = document.getElementById('resumeBtn');
+                const downloadBtn = document.getElementById('downloadBtn');
+
+                speakBtn.disabled = this.isSpeaking && !this.isPaused;
+                stopBtn.disabled = !this.isSpeaking;
+                pauseBtn.disabled = !this.isSpeaking || this.isPaused;
+                resumeBtn.disabled = !this.isSpeaking || !this.isPaused;
+                downloadBtn.disabled = !this.audioBlob;
+            }
+
+            updateStatus(message, type) {
+                const statusElement = document.getElementById('status');
+                statusElement.textContent = message;
+                statusElement.className = `status ${type}`;
+            }
+
+            async downloadAudio() {
+                if (!this.audioBlob) {
+                    alert('请先播放语音以生成音频文件');
+                    return;
+                }
+
+                const url = URL.createObjectURL(this.audioBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `tts-${new Date().getTime()}.wav`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            // 模拟从后端接收文字并转换为语音
+            async simulateBackendResponse(text) {
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        resolve({
+                            text_response: text,
+                            // 在实际应用中，这里可能是后端返回的其他数据
+                            // 我们直接使用前端的TTS功能
+                        });
+                    }, 500);
+                });
+            }
+        }
+
+        // 创建TTS实例
+        const tts = new TextToSpeech();
+
+        // 全局函数供HTML调用
+        function speakText() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                alert('请输入要转换为语音的文字');
+                return;
+            }
+            tts.speak(text);
+        }
+
+        function stopSpeaking() {
+            tts.stop();
+        }
+
+        function pauseSpeaking() {
+            tts.pause();
+        }
+
+        function resumeSpeaking() {
+            tts.resume();
+        }
+
+        function downloadAudio() {
+            tts.downloadAudio();
+        }
+
+        function updateVoice() {
+            if (tts.isSpeaking) {
+                // 如果正在播放，重新播放以应用新的语音设置
+                const text = document.getElementById('textInput').value;
+                tts.stop();
+                setTimeout(() => tts.speak(text), 100);
+            }
+        }
+
+        function updateRate() {
+            const value = document.getElementById('rateControl').value;
+            document.getElementById('rateValue').textContent = value;
+            if (tts.isSpeaking && tts.utterance) {
+                tts.utterance.rate = parseFloat(value);
+            }
+        }
+
+        function updatePitch() {
+            const value = document.getElementById('pitchControl').value;
+            document.getElementById('pitchValue').textContent = value;
+            if (tts.isSpeaking && tts.utterance) {
+                tts.utterance.pitch = parseFloat(value);
+            }
+        }
+
+        function updateVolume() {
+            const value = document.getElementById('volumeControl').value;
+            document.getElementById('volumeValue').textContent = value;
+            if (tts.isSpeaking && tts.utterance) {
+                tts.utterance.volume = parseFloat(value);
+            }
+        }
+
+        // 示例文本
+        const sampleTexts = [
+            "欢迎使用智能语音助手！我可以帮助您处理各种任务，回答问题，或者只是陪您聊天。请告诉我您需要什么帮助？",
+            "今天天气晴朗，温度在25度左右，微风徐徐，是个出门散步的好天气。建议您穿着轻便的衣物，享受这美好的时光。",
+            "最新消息：科技创新大会今日在北京召开，来自全球的专家将讨论人工智能、量子计算等前沿技术。会议将持续三天。",
+            "床前明月光，疑是地上霜。举头望明月，低头思故乡。这首古诗表达了游子对家乡的深深思念之情。",
+            "人工智能技术正在快速发展，深度学习模型在图像识别、自然语言处理等领域取得了突破性进展。未来充满无限可能。"
+        ];
+
+        function loadSampleText(index) {
+            if (index >= 0 && index < sampleTexts.length) {
+                document.getElementById('textInput').value = sampleTexts[index];
+            }
+        }
+
+        // 初始化范围控件的显示值
+        document.addEventListener('DOMContentLoaded', function() {
+            updateRate();
+            updatePitch();
+            updateVolume();
+        });
+    </script>
+</body>
+</html>
