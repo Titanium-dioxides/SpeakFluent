@@ -67,3 +67,8 @@ app.include_router(conv_router)   # /conversations„ÄÅ/conversations/{id}/chat ‚Ä
 @app.options("/register")
 async def options_register():
     return {"message": "CORS preflight handled"}
+from fastapi.responses import RedirectResponse
+
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/static/index.html")
